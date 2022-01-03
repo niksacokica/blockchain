@@ -13,6 +13,8 @@
         private void InitializeComponent(){
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Blockchain));
             this.main_split = new System.Windows.Forms.SplitContainer();
+            this.connect_button = new System.Windows.Forms.Button();
+            this.start_button = new System.Windows.Forms.Button();
             this.other_ip_port_chat = new System.Windows.Forms.TextBox();
             this.your_ip_port_chat = new System.Windows.Forms.TextBox();
             this.log_chain_split = new System.Windows.Forms.SplitContainer();
@@ -20,8 +22,7 @@
             this.blockchain_chat = new System.Windows.Forms.TextBox();
             this.log_lab = new System.Windows.Forms.Label();
             this.log_chat = new System.Windows.Forms.TextBox();
-            this.start_button = new System.Windows.Forms.Button();
-            this.connect_button = new System.Windows.Forms.Button();
+            this.mine_button = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.main_split)).BeginInit();
             this.main_split.Panel1.SuspendLayout();
             this.main_split.Panel2.SuspendLayout();
@@ -42,6 +43,7 @@
             // 
             // main_split.Panel1
             // 
+            this.main_split.Panel1.Controls.Add(this.mine_button);
             this.main_split.Panel1.Controls.Add(this.connect_button);
             this.main_split.Panel1.Controls.Add(this.start_button);
             this.main_split.Panel1.Controls.Add(this.other_ip_port_chat);
@@ -55,6 +57,26 @@
             this.main_split.TabIndex = 0;
             this.main_split.TabStop = false;
             // 
+            // connect_button
+            // 
+            this.connect_button.Location = new System.Drawing.Point(146, 59);
+            this.connect_button.Name = "connect_button";
+            this.connect_button.Size = new System.Drawing.Size(75, 22);
+            this.connect_button.TabIndex = 0;
+            this.connect_button.Text = "CONNECT";
+            this.connect_button.UseVisualStyleBackColor = true;
+            this.connect_button.Click += new System.EventHandler(this.connect_button_Click);
+            // 
+            // start_button
+            // 
+            this.start_button.Location = new System.Drawing.Point(146, 14);
+            this.start_button.Name = "start_button";
+            this.start_button.Size = new System.Drawing.Size(75, 22);
+            this.start_button.TabIndex = 0;
+            this.start_button.Text = "START";
+            this.start_button.UseVisualStyleBackColor = true;
+            this.start_button.Click += new System.EventHandler(this.start_button_Click);
+            // 
             // other_ip_port_chat
             // 
             this.other_ip_port_chat.ForeColor = System.Drawing.Color.Gray;
@@ -65,6 +87,7 @@
             this.other_ip_port_chat.Text = "OTHERS IP:PORT HERE";
             this.other_ip_port_chat.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.other_ip_port_chat.Enter += new System.EventHandler(this.chat_Enter);
+            this.other_ip_port_chat.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.other_ip_port_chat_KeyPress);
             this.other_ip_port_chat.Leave += new System.EventHandler(this.chat_Leave);
             // 
             // your_ip_port_chat
@@ -77,6 +100,7 @@
             this.your_ip_port_chat.Text = "YOUR IP:PORT HERE";
             this.your_ip_port_chat.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.your_ip_port_chat.Enter += new System.EventHandler(this.chat_Enter);
+            this.your_ip_port_chat.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.your_ip_port_chat_KeyPress);
             this.your_ip_port_chat.Leave += new System.EventHandler(this.chat_Leave);
             // 
             // log_chain_split
@@ -156,23 +180,15 @@
             this.log_chat.TabStop = false;
             this.log_chat.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             // 
-            // start_button
+            // mine_button
             // 
-            this.start_button.Location = new System.Drawing.Point(146, 14);
-            this.start_button.Name = "start_button";
-            this.start_button.Size = new System.Drawing.Size(75, 22);
-            this.start_button.TabIndex = 0;
-            this.start_button.Text = "START";
-            this.start_button.UseVisualStyleBackColor = true;
-            // 
-            // connect_button
-            // 
-            this.connect_button.Location = new System.Drawing.Point(146, 59);
-            this.connect_button.Name = "connect_button";
-            this.connect_button.Size = new System.Drawing.Size(75, 22);
-            this.connect_button.TabIndex = 0;
-            this.connect_button.Text = "CONNECT";
-            this.connect_button.UseVisualStyleBackColor = true;
+            this.mine_button.Location = new System.Drawing.Point(300, 15);
+            this.mine_button.Name = "mine_button";
+            this.mine_button.Size = new System.Drawing.Size(150, 75);
+            this.mine_button.TabIndex = 0;
+            this.mine_button.Text = "MINE";
+            this.mine_button.UseVisualStyleBackColor = true;
+            this.mine_button.Click += new System.EventHandler(this.mine_button_Click);
             // 
             // Blockchain
             // 
@@ -182,6 +198,7 @@
             this.Controls.Add(this.main_split);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "Blockchain";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "blockchain";
             this.main_split.Panel1.ResumeLayout(false);
             this.main_split.Panel1.PerformLayout();
@@ -210,6 +227,7 @@
         private System.Windows.Forms.TextBox other_ip_port_chat;
         private System.Windows.Forms.Button start_button;
         private System.Windows.Forms.Button connect_button;
+        private System.Windows.Forms.Button mine_button;
     }
 }
 
