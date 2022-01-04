@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
@@ -8,7 +7,7 @@ namespace blockchain{
     class block{
         private int index;
         private string data;
-        private DateTime time;
+        private string time;
         private string hash;
         private string prevHash;
         private int difficulty;
@@ -20,21 +19,21 @@ namespace blockchain{
             index = ind;
             data = info;
             prevHash = prevHs;
-            time = DateTime.Now;
+            time = DateTime.Now.ToString();
             difficulty = diff;
             nonce = n;
-            hash = BitConverter.ToString( sha.ComputeHash( Encoding.UTF8.GetBytes( index.ToString() + time.ToString() + data + prevHash + difficulty.ToString() + nonce.ToString() ) ) ).Replace( "-", "" );
+            hash = BitConverter.ToString( sha.ComputeHash( Encoding.UTF8.GetBytes( index.ToString() + time + data + prevHash + difficulty.ToString() + nonce.ToString() ) ) ).Replace( "-", "" );
         }
 
         public int Index{ get => index; }
 
         public string Data{ get => data; }
 
-        public DateTime Time{ get => time; set{ time = value; hash = BitConverter.ToString( sha.ComputeHash( Encoding.UTF8.GetBytes( index.ToString() + time.ToString() + data + prevHash ) ) ).Replace( "-", "" ); } }
+        public string Time{ get => time; set{ time = value; hash = BitConverter.ToString( sha.ComputeHash( Encoding.UTF8.GetBytes( index.ToString() + time + data + prevHash + difficulty.ToString() + nonce.ToString()) ) ).Replace( "-", "" ); } }
 
         public string Hash{ get => hash; }
 
-        public string PreviousHash{ get => prevHash; set{ prevHash = value; hash = BitConverter.ToString( sha.ComputeHash( Encoding.UTF8.GetBytes( index.ToString() + time.ToString() + data + prevHash ) ) ).Replace( "-", "" ); } }
+        public string PreviousHash{ get => prevHash; set{ prevHash = value; hash = BitConverter.ToString( sha.ComputeHash( Encoding.UTF8.GetBytes( index.ToString() + time + data + prevHash + difficulty.ToString() + nonce.ToString()) ) ).Replace( "-", "" ); } }
 
         public int Difficulty{ get => difficulty; }
 

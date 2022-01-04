@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Net;
@@ -20,7 +21,11 @@ namespace blockchain{
         delegate void appendTextCallback( TextBox tb, string text );
         delegate void refreshCallback();
 
-        private int diff = 1;
+        private int diff = 2;
+        private int expected_time_max = 300000;
+        private int expected_time_min = 60000;
+
+        private Stopwatch timer = new Stopwatch();
 
         public Blockchain() => InitializeComponent();
 
@@ -76,7 +81,7 @@ namespace blockchain{
             NetworkStream ns = client.GetStream();
 
             while( client.Connected ){
-                byte[] rec = new byte[256];
+                byte[] rec = new byte[333];
                 try{
                     ns.Read( rec, 0, rec.Length );
                 }catch{}
@@ -107,7 +112,7 @@ namespace blockchain{
                             }
                         }else if( msg.ContainsKey( "replace" ) ){
                             block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
-                                Time = Convert.ToDateTime( msg["time"] )
+                                Time = msg["time"]
                             };
 
                             if( blocks.Count <= bl.Index )
@@ -119,14 +124,47 @@ namespace blockchain{
                                 blocks = blocks.OrderBy( o => o.Index ).ToList();
                             }
 
+                            sendToEveryone( bl, "check" );
+
                             refreshBlockchainLog();
                         }else if( msg.ContainsKey( "block" ) ){
                             block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
-                                Time = Convert.ToDateTime( msg["time"] )
+                                Time = msg["time"]
                             };
-                           
-                            blocks.Add( bl );
-                            refreshBlockchainLog();
+
+                            if( bl.Hash.Equals( msg["hash"] ) ){
+                                if( diff != Int32.Parse( msg["new_diff"] ) ){
+                                    diff = Int32.Parse( msg["new_diff"] );
+
+                                    if (timer.IsRunning)
+                                        timer.Restart();
+                                }
+
+                                sendToEveryone( bl, "check" );
+
+                                blocks.Add( bl );
+                                refreshBlockchainLog();
+                            }
+                        }else if( msg.ContainsKey( "check" ) ){
+                            block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
+                                Time = msg["time"]
+                            };
+
+                            if( bl.Hash.Equals( msg["hash"] ) ){
+                                if( blocks.Count < bl.Index + 1 || !blocks[bl.Index].Hash.Equals( msg["hash"] ) ){
+                                    if( diff != Int32.Parse( msg["new_diff"] ) ){
+                                        diff = Int32.Parse( msg["new_diff"] );
+
+                                        if (timer.IsRunning)
+                                            timer.Restart();
+                                    }
+
+                                    sendToEveryone( bl, "check" );
+
+                                    blocks.Add( bl );
+                                    refreshBlockchainLog();
+                                }
+                            }
                         }
                     }
                 });
@@ -166,7 +204,7 @@ namespace blockchain{
 
         private void receive( TcpClient client ){
             while( client.Connected ){
-                byte[] rec = new byte[256];
+                byte[] rec = new byte[333];
                 try{
                     client.GetStream().Read( rec, 0, rec.Length );
                 }catch{}
@@ -188,7 +226,7 @@ namespace blockchain{
                             }
                         }else if( msg.ContainsKey( "replace" ) ){
                             block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
-                                Time = Convert.ToDateTime( msg["time"] )
+                                Time = msg["time"]
                             };
 
                             if( blocks.Count <= bl.Index )
@@ -200,14 +238,47 @@ namespace blockchain{
                                 blocks = blocks.OrderBy( o => o.Index ).ToList();
                             }
 
+                            sendToEveryone( bl, "check" );
+
                             refreshBlockchainLog();
                         }else if( msg.ContainsKey( "block" ) ){
                             block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
-                                Time = Convert.ToDateTime( msg["time"] )
+                                Time = msg["time"]
                             };
-                           
-                            blocks.Add( bl );
-                            refreshBlockchainLog();
+
+                            if( bl.Hash.Equals(msg["hash"] ) ){
+                                if( diff != Int32.Parse( msg["new_diff"] ) ){
+                                    diff = Int32.Parse( msg["new_diff"] );
+
+                                    if (timer.IsRunning)
+                                        timer.Restart();
+                                }
+
+                                sendToEveryone(bl, "check");
+
+                                blocks.Add(bl);
+                                refreshBlockchainLog();
+                            }
+                        }else if( msg.ContainsKey( "check" ) ){
+                            block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
+                                Time = msg["time"]
+                            };
+
+                            if( bl.Hash.Equals( msg["hash"] ) ){
+                                if( blocks.Count < bl.Index + 1 || !blocks[bl.Index].Hash.Equals( msg["hash"] ) ){
+                                    if( diff != Int32.Parse( msg["new_diff"] ) ){
+                                        diff = Int32.Parse( msg["new_diff"] );
+
+                                        if (timer.IsRunning)
+                                            timer.Restart();
+                                    }
+
+                                    sendToEveryone( bl, "check" );
+
+                                    blocks.Add( bl );
+                                    refreshBlockchainLog();
+                                }
+                            }
                         }
                     }
                 });
@@ -231,7 +302,6 @@ namespace blockchain{
             }
 
             appendText( log_chat, "Succesfully connected to" + ipPort + "!" );
-            Task.Run( () => receive( client ) );
 
             other_ip_port_chat.Enabled = true;
             connect_button.Enabled = true;
@@ -242,6 +312,8 @@ namespace blockchain{
             string json = JsonConvert.SerializeObject( send );
             byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
             client.GetStream().Write( bytes, 0, bytes.Length );
+
+            Task.Run( () => receive( client ) );
         }
 
         private void connect_button_Click( object sender, EventArgs e ){
@@ -300,6 +372,8 @@ namespace blockchain{
 
             int n = 0;
             block bl;
+            
+            timer.Start();
             while( true ){
                 bl = new block( blocks.Count, "Block NO." + blocks.Count, ( blocks.Count == 0 ) ? "0" : blocks[blocks.Count-1].Hash, diff, n );
 
@@ -311,17 +385,28 @@ namespace blockchain{
                 if( n % 50000 == 0 )
                     appendText( log_chat, "Failed hash: " + bl.Hash );
             }
+            timer.Stop();
 
             mine_button.Enabled = true;
 
-            appendText(log_chat, "Successful hash: " + bl.Hash);
+            appendText(log_chat, "Successful hash: " + bl.Hash + ", in " + timer.ElapsedMilliseconds.ToString() );
             blocks.Add( bl );
 
             refreshBlockchainLog();
-        
+
+            if( timer.ElapsedMilliseconds > expected_time_max )
+                diff = Math.Max( 1, diff - 2 );
+            else if( timer.ElapsedMilliseconds < expected_time_min )
+                diff++;
+
+            sendToEveryone( bl, "block" );
+        }
+
+        private void sendToEveryone( block bl, string msg ){
             foreach( TcpClient client in connected.ToArray() ){
                 Dictionary<string, string> send = bl.ToDictionary();
-                send.Add( "block", "" );
+                send.Add( msg, "" );
+                send.Add( "new_diff", diff.ToString() );
                 string json = JsonConvert.SerializeObject( send );
 
                 byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
@@ -331,7 +416,8 @@ namespace blockchain{
 
             foreach( TcpClient client in connect.ToArray() ){
                 Dictionary<string, string> send = bl.ToDictionary();
-                send.Add( "block", "" );
+                send.Add( msg, "" );
+                send.Add( "new_diff", diff.ToString() );
                 string json = JsonConvert.SerializeObject( send );
 
                 byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
