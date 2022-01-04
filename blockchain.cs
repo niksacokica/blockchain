@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace blockchain{
@@ -13,9 +14,13 @@ namespace blockchain{
 
         private TcpListener listener;
         private List<TcpClient> connected = new List<TcpClient>();
+        private List<TcpClient> connect = new List<TcpClient>();
         private List<block> blocks = new List<block>();
 
         delegate void appendTextCallback( TextBox tb, string text );
+        delegate void refreshCallback();
+
+        private int diff = 1;
 
         public Blockchain() => InitializeComponent();
 
@@ -24,6 +29,16 @@ namespace blockchain{
                 tb.Invoke( new appendTextCallback( appendText ), new object[] { tb, text } );
             else
                 tb.AppendText( text + "\r\n" );
+        }
+
+        private void refreshBlockchainLog(){
+            if( blockchain_chat.InvokeRequired )
+                blockchain_chat.Invoke( new refreshCallback( refreshBlockchainLog ), new object[] { } );
+            else{
+                blockchain_chat.Clear();
+                for( int i=0; i<blocks.Count; i++ )
+                    appendText( blockchain_chat, "Indeks: " + blocks[i].Index.ToString() + "\r\nPodatek: " + blocks[i].Data + "\r\nČas: " + blocks[i].Time.ToString() + "\r\nHash: " + blocks[i].Hash + "\r\nPrejšnji hash: " + blocks[i].PreviousHash + "\r\nDiff: " + blocks[i].Difficulty + "\r\nNonce: " + blocks[i].Nonce + "\r\n" );
+            }
         }
 
         #region shadow_text
@@ -66,12 +81,55 @@ namespace blockchain{
                     ns.Read( rec, 0, rec.Length );
                 }catch{}
 
-                string read = Encoding.UTF8.GetString( rec, 0, rec.Length );
-                Dictionary<string, string> msg = JsonConvert.DeserializeObject<Dictionary<string, string>>( @read );
+                Task.Run( () => {
+                    string read = Encoding.UTF8.GetString( rec, 0, rec.Length );
+                    if( !string.IsNullOrEmpty( @read ) ){
+                        Dictionary<string, string> msg = JsonConvert.DeserializeObject<Dictionary<string, string>>( @read );
+                        Dictionary<string, string> send = new Dictionary<string, string>();
 
-                block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"] );
-                if( bl.Hash.Equals( msg["hash"] ) ){
-                }
+                        if( msg.ContainsKey( "length" ) ){
+                            if( Int32.Parse( msg["length"] ) > blocks.Count ){
+                                send.Add( "send", "" );
+
+                                string json = JsonConvert.SerializeObject( send );
+                                byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
+                                client.GetStream().Write( bytes, 0, bytes.Length );
+                            }
+                            else if( Int32.Parse( msg["length"] ) < blocks.Count){
+                                for(int i=0; i<blocks.Count; i++){
+                                    send = blocks[i].ToDictionary();
+                                    send.Add( "replace", "" );
+
+                                    string json = JsonConvert.SerializeObject( send );
+                                    byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
+                                    client.GetStream().Write( bytes, 0, bytes.Length );
+                                }
+                            }
+                        }else if( msg.ContainsKey( "replace" ) ){
+                            block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
+                                Time = Convert.ToDateTime( msg["time"] )
+                            };
+
+                            if( blocks.Count <= bl.Index )
+                                blocks.Add( bl );
+                            else if( blocks[bl.Index].Index == bl.Index )
+                                blocks[bl.Index] = bl;
+                            else{
+                                blocks.Add( bl );
+                                blocks = blocks.OrderBy( o => o.Index ).ToList();
+                            }
+
+                            refreshBlockchainLog();
+                        }else if( msg.ContainsKey( "block" ) ){
+                            block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
+                                Time = Convert.ToDateTime( msg["time"] )
+                            };
+                           
+                            blocks.Add( bl );
+                            refreshBlockchainLog();
+                        }
+                    }
+                });
             }
         }
 
@@ -106,6 +164,56 @@ namespace blockchain{
 
         #region connections
 
+        private void receive( TcpClient client ){
+            while( client.Connected ){
+                byte[] rec = new byte[256];
+                try{
+                    client.GetStream().Read( rec, 0, rec.Length );
+                }catch{}
+
+                Task.Run( () => {
+                    string read = Encoding.UTF8.GetString( rec, 0, rec.Length );
+                    if( !string.IsNullOrEmpty( @read ) ){
+                        Dictionary<string, string> msg = JsonConvert.DeserializeObject<Dictionary<string, string>>( @read );
+                        Dictionary<string, string> send = new Dictionary<string, string>();
+
+                        if( msg.ContainsKey("send") ){
+                            for(int i=0; i<blocks.Count; i++){
+                                send = blocks[i].ToDictionary();
+                                send.Add( "replace", "" );
+
+                                string json = JsonConvert.SerializeObject( send );
+                                byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
+                                client.GetStream().Write( bytes, 0, bytes.Length );
+                            }
+                        }else if( msg.ContainsKey( "replace" ) ){
+                            block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
+                                Time = Convert.ToDateTime( msg["time"] )
+                            };
+
+                            if( blocks.Count <= bl.Index )
+                                blocks.Add( bl );
+                            else if( blocks[bl.Index].Index == bl.Index )
+                                blocks[bl.Index] = bl;
+                            else{
+                                blocks.Add( bl );
+                                blocks = blocks.OrderBy( o => o.Index ).ToList();
+                            }
+
+                            refreshBlockchainLog();
+                        }else if( msg.ContainsKey( "block" ) ){
+                            block bl = new block( Int32.Parse( msg["index"] ), msg["data"], msg["prevHash"], Int32.Parse( msg["diff"] ), Int32.Parse( msg["nonce"] ) ){
+                                Time = Convert.ToDateTime( msg["time"] )
+                            };
+                           
+                            blocks.Add( bl );
+                            refreshBlockchainLog();
+                        }
+                    }
+                });
+            }
+        }
+
         private void connectToServer( string ipPort ){
             other_ip_port_chat.Enabled = false;
             connect_button.Enabled = false;
@@ -114,6 +222,7 @@ namespace blockchain{
 
             try{
                 client = new TcpClient( ipPort.Split( ':' )[0], Int32.Parse( ipPort.Split( ':' )[1] ) );
+                connect.Add( client );
             }catch( Exception ex ){
                 MessageBox.Show( ex.Message, "Exception", MessageBoxButtons.OK, MessageBoxIcon.Warning );
                 other_ip_port_chat.Enabled = true;
@@ -122,9 +231,17 @@ namespace blockchain{
             }
 
             appendText( log_chat, "Succesfully connected to" + ipPort + "!" );
+            Task.Run( () => receive( client ) );
 
             other_ip_port_chat.Enabled = true;
             connect_button.Enabled = true;
+
+            Dictionary<string, string> send = new Dictionary<string, string>(){
+                { "length", blocks.Count.ToString() }
+            };
+            string json = JsonConvert.SerializeObject( send );
+            byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
+            client.GetStream().Write( bytes, 0, bytes.Length );
         }
 
         private void connect_button_Click( object sender, EventArgs e ){
@@ -179,17 +296,47 @@ namespace blockchain{
         }
 
         private void mine_button_Click( object sender, EventArgs e ){
-            block bl = new block( blocks.Count, "Block NO." + blocks.Count, ( blocks.Count == 0 ) ? "0" : blocks[blocks.Count-1].Hash );
+            mine_button.Enabled = false;
+
+            int n = 0;
+            block bl;
+            while( true ){
+                bl = new block( blocks.Count, "Block NO." + blocks.Count, ( blocks.Count == 0 ) ? "0" : blocks[blocks.Count-1].Hash, diff, n );
+
+                string starter = "".PadLeft( diff, '0' );
+                if( bl.Hash.StartsWith( starter ) )
+                    break;
+                else
+                    n++;
+                if( n % 50000 == 0 )
+                    appendText( log_chat, "Failed hash: " + bl.Hash );
+            }
+
+            mine_button.Enabled = true;
+
+            appendText(log_chat, "Successful hash: " + bl.Hash);
             blocks.Add( bl );
 
-            blockchain_chat.Clear();
-            for( int i=0; i<blocks.Count; i++ )
-                appendText( blockchain_chat, "Indeks: " + blocks[i].Index.ToString() + "\r\nPodatek: " + blocks[i].Data + "\r\nČas: " + blocks[i].Time.ToString() + "\r\nHash: " + blocks[i].Hash + "\r\nPrejšnji hash: " + blocks[i].PreviousHash + "\r\n" );
+            refreshBlockchainLog();
         
             foreach( TcpClient client in connected.ToArray() ){
-                byte[] send = Encoding.UTF8.GetBytes( bl.ToJson().ToCharArray(), 0, bl.ToJson().Length );
+                Dictionary<string, string> send = bl.ToDictionary();
+                send.Add( "block", "" );
+                string json = JsonConvert.SerializeObject( send );
 
-                client.GetStream().Write( send, 0, send.Length );
+                byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
+
+                client.GetStream().Write( bytes, 0, bytes.Length );
+            }
+
+            foreach( TcpClient client in connect.ToArray() ){
+                Dictionary<string, string> send = bl.ToDictionary();
+                send.Add( "block", "" );
+                string json = JsonConvert.SerializeObject( send );
+
+                byte[] bytes = Encoding.UTF8.GetBytes( json.ToCharArray(), 0, json.Length );
+
+                client.GetStream().Write( bytes, 0, bytes.Length );
             }
         }
     }
